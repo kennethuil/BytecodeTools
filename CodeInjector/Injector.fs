@@ -6,14 +6,22 @@ module Injector =
     open System.Linq.Expressions
     open Mono.Cecil
     open Mono.Cecil.Cil
+
+    let getMethodRefFromLambda (importInto:ModuleDefinition) (x:LambdaExpression) =
+        let body = x.Body
+        match body with
+        | :? MethodCallExpression as c ->
+            let methodInfo = c.Method
+            importInto.Import methodInfo
+        | _ -> failwith ("Not currently supporting this type of expression")
     
     // An F# lambda can magically become a LINQ expression,
     // but only if it's a parameter of a static method.
-    // So we run it through right here.
-    // NOTE: Trying to overload Quote with an Expression<System.Func<'a,'b>>
-    // fails because it can't decide between Action<'a> and <Func<'a,unit>>.
     type Expr = 
         static member Quote<'a>(e:Expression<System.Action<'a>>) = e
+
+        static member MethodRefFromLambda<'a>  ((x:Expression<Action<'a>>),(importInto:ModuleDefinition)) =
+            getMethodRefFromLambda importInto x
 
     let createLdarg (ilp:ILProcessor) i =
         match i with
@@ -55,10 +63,3 @@ module Injector =
         
         injectionTarget
 
-    let getMethodRefFromLambda (importInto:ModuleDefinition)  (x:LambdaExpression) =
-        let body = x.Body
-        match body with
-        | :? MethodCallExpression as c ->
-            let methodInfo = c.Method
-            importInto.Import methodInfo
-        | _ -> failwith ("Not currently supporting this type of expression")
