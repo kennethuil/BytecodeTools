@@ -20,6 +20,10 @@ module Injector =
     type Expr = 
         static member Quote<'a>(e:Expression<System.Action<'a>>) = e
 
+        // Turn a simple lambda into a MethodRef.
+        // NOTE: If your lambda calls a generic method, the MethodRef will have all the
+        // generic parameters filled in from whatever your lambda specifies (you can't have a
+        // call to a generic method with open generic parameters, either in a lambda or anywhere else)
         static member MethodRefFromLambda<'a>  ((x:Expression<Action<'a>>),(importInto:ModuleDefinition)) =
             getMethodRefFromLambda importInto x
 
@@ -35,6 +39,7 @@ module Injector =
 
     let getLoadTargetArg (ilp:ILProcessor) parameterPos (p:ParameterDefinition)  =
         // TODO: look at target argument attributes
+        // TODO: handle generic arguments
 
         // in the absence of attributes, incoming parameter N should be passed to
         // target parameter N
