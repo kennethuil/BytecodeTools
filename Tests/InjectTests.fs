@@ -31,7 +31,7 @@ module InjectTests =
 
 
     // Need a class inheriting MarshalByRefObject to do cross-domain stuff
-    type InjectionTargetClass() = 
+    type CrossDomainMethods() = 
         inherit MarshalByRefObject()
 
         member this.RunInjectionTarget1 x y =
@@ -50,7 +50,7 @@ module InjectTests =
             (z, ExampleTracer.GetMessages())
 
 
-    let injectedCallTargetWithThis (this:InjectionTargetClass) (x:int) (y:int) =
+    let injectedCallTargetWithThis (this:CrossDomainMethods) (x:int) (y:int) =
         ExampleTracer.WriteMessage("x = "+ x.ToString() + ", y = " + y.ToString())
 
     let doInjection (f:ModuleDefinition->unit) =
@@ -81,7 +81,7 @@ module InjectTests =
             let updatedTarget = patchMethodBegin targetMethod injectedCallTargetRef
             ())
 
-        let targetInstance = domain.CreateInstance<InjectionTargetClass>()
+        let targetInstance = domain.CreateInstance<CrossDomainMethods>()
 
         let messages = targetInstance.RunInjectionTarget1 3 4
         Assert.AreEqual("x = 3, y = 4", messages.Head)
@@ -98,11 +98,11 @@ module InjectTests =
 
             let targetMethod = targetType.Methods |> Seq.filter(fun x->x.Name = "InjectionTarget2") |> Seq.exactlyOne
 
-            let injectedCallTargetCallRef = Expr.MethodRefFromLambda ((fun() -> (injectedCallTargetWithThis (InjectionTargetClass()) 3 5)), mainModule)
+            let injectedCallTargetCallRef = Expr.MethodRefFromLambda ((fun() -> (injectedCallTargetWithThis (CrossDomainMethods()) 3 5)), mainModule)
             let updatedTarget = patchMethodBegin targetMethod injectedCallTargetCallRef
             ())
 
-        let targetInstance = domain.CreateInstance<InjectionTargetClass>()
+        let targetInstance = domain.CreateInstance<CrossDomainMethods>()
         let (result, messages) = targetInstance.RunInjectionTarget2 3 4
         Assert.AreEqual("x = 3, y = 4", messages.Head)
         Assert.AreEqual(12, result)
@@ -125,7 +125,7 @@ module InjectTests =
             let updatedTarget = patchMethodBegin targetMethod injectedCallTargetRef
             ()
         )
-        let targetInstance = domain.CreateInstance<InjectionTargetClass>()
+        let targetInstance = domain.CreateInstance<CrossDomainMethods>()
         let (result, messages) = targetInstance.RunGenericInjectionTarget "a" "b"
         
         ()
