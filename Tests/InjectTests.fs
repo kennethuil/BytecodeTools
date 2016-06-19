@@ -94,7 +94,7 @@ module InjectTests =
             // Need the nested class define above so we can patch an instance method there.
             let targetType = (types |> Seq.filter(fun x -> x.FullName.Equals("BytecodeTools.Tests.InjectTests"))
                                 |> Seq.exactlyOne).NestedTypes
-                                |> Seq.filter(fun x -> x.Name.Equals("InjectionTargetClass")) |> Seq.exactlyOne
+                                |> Seq.filter(fun x -> x.Name.Equals("CrossDomainMethods")) |> Seq.exactlyOne
 
             let targetMethod = targetType.Methods |> Seq.filter(fun x->x.Name = "InjectionTarget2") |> Seq.exactlyOne
 
