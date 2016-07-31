@@ -20,6 +20,9 @@ module InjectTests =
     let injectionTarget1 x y =
         x + y
 
+    let voidInjectionTarget x y =
+        ()
+
     let genericInjectionTarget x y =
         [|x;y|]
 
@@ -33,6 +36,15 @@ module InjectTests =
     let genericInjectedCallTarget x y =
         let message = sprintf "x = %A, y = %A" x y
         ExampleTracer.WriteMessage(message)
+
+    let injectedCallTargetForReturn (x:int) (y:int) (result:int) =
+        let message = sprintf "return value = %A" result
+        ExampleTracer.WriteMessage(message)
+
+    let injectedCallTargetForReturnReplacement (x:int) (y:int) (result:int) =
+        let message = sprintf "return value = %A" result
+        ExampleTracer.WriteMessage(message)
+        42
 
 
     // Need a class inheriting MarshalByRefObject to do cross-domain stuff
@@ -94,13 +106,48 @@ module InjectTests =
         ()
 
     [<Test>]
-    let testInjectMethodBypass() =
+    let testInjectMethodReturn() =
         use domain = doInjection (fun mainModule ->
             let types = mainModule.Types
             let targetType = types |> Seq.filter(fun x -> x.FullName.Equals("BytecodeTools.Tests.InjectTests")) |> Seq.exactlyOne
             let targetMethod = targetType.Methods |> Seq.filter(fun x->x.Name = "injectionTarget1") |> Seq.exactlyOne
 
-            //let injectedCallTargetRef = Expr.MethodRefFromLambda ((fun () -> injectedReplacement 2 3),mainModule)
+            let injectedCallTargetRef = Expr.MethodRefFromLambda ((fun () -> injectedCallTargetForReturn 2 3 4),mainModule)
+            let updatedTarget = patchMethodReturn targetMethod injectedCallTargetRef
+            ())
+
+        let targetInstance = domain.CreateInstance<CrossDomainMethods>()
+
+        let (result, messages) = targetInstance.RunInjectionTarget1 3 4
+        Assert.AreEqual("return value = 7", messages.Head)
+        Assert.AreEqual(7, result)
+        ()
+
+    [<Test>]
+    let testInjectMethodReturnReplace() =
+        use domain = doInjection (fun mainModule ->
+            let types = mainModule.Types
+            let targetType = types |> Seq.filter(fun x -> x.FullName.Equals("BytecodeTools.Tests.InjectTests")) |> Seq.exactlyOne
+            let targetMethod = targetType.Methods |> Seq.filter(fun x->x.Name = "injectionTarget1") |> Seq.exactlyOne
+
+            let injectedCallTargetRef = targetType.Methods |> Seq.filter(fun x->x.Name = "injectedCallTargetForReturnReplacement")
+                                        |> Seq.exactlyOne
+            let updatedTarget = patchMethodReturn targetMethod injectedCallTargetRef
+            ())
+
+        let targetInstance = domain.CreateInstance<CrossDomainMethods>()
+
+        let (result, messages) = targetInstance.RunInjectionTarget1 3 4
+        Assert.AreEqual("return value = 7", messages.Head)
+        Assert.AreEqual(42, result)
+        () 
+
+    [<Test>]
+    let testInjectMethodBypass() =
+        use domain = doInjection (fun mainModule ->
+            let types = mainModule.Types
+            let targetType = types |> Seq.filter(fun x -> x.FullName.Equals("BytecodeTools.Tests.InjectTests")) |> Seq.exactlyOne
+            let targetMethod = targetType.Methods |> Seq.filter(fun x->x.Name = "injectionTarget1") |> Seq.exactlyOne
             let injectedCallTargetRef = targetType.Methods |> Seq.filter(fun x->x.Name = "injectedReplacement") |> Seq.exactlyOne
             let updatedTarget = patchMethodBypass targetMethod injectedCallTargetRef
             ())
