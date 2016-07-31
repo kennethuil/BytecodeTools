@@ -6,6 +6,7 @@ open System.IO
 open System.Reflection
 open Mono.Cecil
 open CodeInjector.Injector
+open CodeInjector.Attributes
 open BytecodeTools.Tests.DomainHelper
 
 module InjectTests =
@@ -25,6 +26,10 @@ module InjectTests =
     let injectedCallTarget (x:int) (y:int) =
         ExampleTracer.WriteMessage("x = " + x.ToString() + ", y = " + y.ToString())
 
+    let injectedReplacement (x:int) (y:int) =
+        ExampleTracer.WriteMessage("Injected replacement: x = " + x.ToString() + ", y = " + y.ToString())
+        42
+
     let genericInjectedCallTarget x y =
         let message = sprintf "x = %A, y = %A" x y
         ExampleTracer.WriteMessage(message)
@@ -36,7 +41,7 @@ module InjectTests =
 
         member this.RunInjectionTarget1 x y =
             let z = injectionTarget1 x y
-            ExampleTracer.GetMessages()
+            (z, ExampleTracer.GetMessages())
 
         member this.InjectionTarget2 x y =
             x * y
@@ -83,9 +88,31 @@ module InjectTests =
 
         let targetInstance = domain.CreateInstance<CrossDomainMethods>()
 
-        let messages = targetInstance.RunInjectionTarget1 3 4
+        let (result, messages) = targetInstance.RunInjectionTarget1 3 4
         Assert.AreEqual("x = 3, y = 4", messages.Head)
+        Assert.AreEqual(7, result)
         ()
+
+    [<Test>]
+    let testInjectMethodBypass() =
+        use domain = doInjection (fun mainModule ->
+            let types = mainModule.Types
+            let targetType = types |> Seq.filter(fun x -> x.FullName.Equals("BytecodeTools.Tests.InjectTests")) |> Seq.exactlyOne
+            let targetMethod = targetType.Methods |> Seq.filter(fun x->x.Name = "injectionTarget1") |> Seq.exactlyOne
+
+            //let injectedCallTargetRef = Expr.MethodRefFromLambda ((fun () -> injectedReplacement 2 3),mainModule)
+            let injectedCallTargetRef = targetType.Methods |> Seq.filter(fun x->x.Name = "injectedReplacement") |> Seq.exactlyOne
+            let updatedTarget = patchMethodBypass targetMethod injectedCallTargetRef
+            ())
+        let targetInstance = domain.CreateInstance<CrossDomainMethods>()
+
+        let (result, messages) = targetInstance.RunInjectionTarget1 3 4
+        Assert.AreEqual("Injected replacement: x = 3, y = 4", messages.Head)
+        Assert.AreEqual(42, result)
+        ()
+
+
+        
     [<Test>]
     let testInjectInstanceMethodBegin() =
         use domain = doInjection (fun mainModule ->

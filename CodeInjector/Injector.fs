@@ -51,6 +51,7 @@ module Injector =
     let insertInstructionsBefore (ilp:ILProcessor) (insertBefore:Instruction) (instrs) =
         instrs |> Seq.iter (fun x -> (ilp.InsertBefore(insertBefore, x)))
 
+    
     let patchMethodBegin (injectionTarget:MethodDefinition) (injectedCallTarget:MethodReference) =
         let body = injectionTarget.Body;
         let instructions = body.Instructions;
@@ -68,5 +69,26 @@ module Injector =
         let call = ilp.Create(OpCodes.Call, injectedCallTarget)
         ilp.InsertBefore(first, call)
         
+        injectionTarget
+
+    let patchMethodBypass (injectionTarget:MethodDefinition) (injectedCallTarget:MethodReference) =
+        let body = injectionTarget.Body;
+        let instructions = body.Instructions;
+        let ilp = body.GetILProcessor();
+
+        // TODO: Skip initial call to base constructor, if present.
+        let first = instructions.[0]
+
+        // NOTE: Target should be static, and accessible from method m.
+        let targetParams = injectedCallTarget.Parameters;
+        let targetParamLoads = targetParams |> Seq.mapi (getLoadTargetArg ilp)
+        targetParamLoads |> Seq.concat |> insertInstructionsBefore ilp first
+
+        // Call the injectedCallTarget method.
+        let call = ilp.Create(OpCodes.Call, injectedCallTarget)
+        ilp.InsertBefore(first, call)
+
+        // Return whatever the injected call returned
+        ilp.InsertBefore(first, ilp.Create(OpCodes.Ret))        
         injectionTarget
 
